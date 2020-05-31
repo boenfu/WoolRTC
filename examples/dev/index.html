@@ -4,8 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>pist</title>
+    <style>
+      #chat {
+        width: 600px;
+        height: 300px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        border: 1px solid #000;
+      }
+
+      #chat > div {
+        line-height: 24px;
+        padding: 4px 12px;
+      }
+
+      #chat > div:hover {
+        background-color: #eee;
+      }
+
+      #chat > div > span {
+        padding-right: 8px;
+        color: #999;
+      }
+    </style>
   </head>
   <body>
+    <h4>
+      点对点通讯测试
+    </h4>
     <p>
       gist token:
       <input id="token" type="text" placeholder="token" value="" />
@@ -16,9 +42,13 @@
       <button id="join">加入默认房间</button>
     </p>
 
+    <div id="chat">
+      <div><span>系统:</span> 请初始化应用 😇</div>
+    </div>
+
     <p>
       <input id="text" type="text" placeholder="消息内容" />
-      <button id="send">发消息</button>
+      <button id="send">发送</button>
     </p>
 
     <script src="./main.ts"></script>

@@ -119,11 +119,11 @@ export class Connection<
     }, PEEK_ANSWER_RECEIVED_INTERVAL);
   }
 
-  async joinRoom(roomId: string = DEFAULT_ROOM_ID): Promise<void> {
+  async joinRoom(roomId: string = DEFAULT_ROOM_ID): Promise<boolean> {
     let room = await this.getRoom(roomId);
 
     if (!room.offer) {
-      return;
+      return false;
     }
 
     let connection = this.connection;
@@ -147,6 +147,8 @@ export class Connection<
       },
       answer: connection.localDescription?.toJSON(),
     });
+
+    return true;
   }
 
   async leaveRoom(_roomId: string = 'default_room'): Promise<void> {
