@@ -5,12 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>pist</title>
     <style>
-      #chat {
+      #chat,
+      video {
         width: 600px;
         height: 300px;
         overflow-x: hidden;
         overflow-y: auto;
         border: 1px solid #000;
+      }
+
+      .video-wrapper {
+        position: relative;
+        width: max-content;
+      }
+
+      .mini-video {
+        position: absolute;
+        width: 150px;
+        height: 75px;
+        bottom: 1rem;
+        right: 1rem;
+        cursor: pointer;
+        z-index: 1;
       }
 
       #chat > div {
@@ -25,6 +41,16 @@
       #chat > div > span {
         padding-right: 8px;
         color: #999;
+      }
+
+      #audio::before,
+      #video::before {
+        content: '打开';
+      }
+
+      #audio.opening::before,
+      #video.opening::before {
+        content: '关闭';
       }
     </style>
   </head>
@@ -43,13 +69,19 @@
     </p>
 
     <div id="chat">
-      <div><span>系统:</span> 请初始化应用 😇</div>
+      <div><span>系统:</span>请初始化应用 😇</div>
     </div>
 
     <p>
       <input id="text" type="text" placeholder="消息内容" />
       <button id="send">发送</button>
     </p>
+
+    <p class="video-wrapper">
+      <video id="video-remote" autoplay></video>
+      <video id="video-local" class="mini-video" autoplay></video>
+    </p>
+    <p><button id="audio">语音</button> <button id="video">视频</button></p>
 
     <script src="./main.ts"></script>
   </body>

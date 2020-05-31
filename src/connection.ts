@@ -23,11 +23,13 @@ export interface IEvent<TType extends string, TData> {
   data: TData;
 }
 
-export type BuiltinEvent = OpenEvent | CloseEvent;
+export type BuiltinEvent = OpenEvent | CloseEvent | TrackEvent;
 
 export type OpenEvent = IEvent<'open', Event>;
 
 export type CloseEvent = IEvent<'close', Event>;
+
+export type TrackEvent = IEvent<'track', RTCTrackEvent>;
 
 type EventWithBuiltinEvent<TEvent extends IEvent<any, any>> =
   | TEvent
@@ -48,8 +50,10 @@ export class Connection<
 
   private pendingRTCIceCandidates: (RTCIceCandidate | null)[] = [];
 
+  private ready!: Promise<void>;
+
   constructor(token: string, gistId?: string) {
-    this.initialize(token, gistId).catch(console.error);
+    this.ready = this.initialize(token, gistId).catch(console.error);
   }
 
   on(type: TEvent['type'], listener: (data: TEvent['data']) => void): void {
@@ -60,8 +64,33 @@ export class Connection<
     this.channel?.send(JSON.stringify({type, data}));
   }
 
+  addTrack(track: MediaStreamTrack, ...streams: MediaStream[]): RTCRtpSender {
+    return this.connection.addTrack(track, ...streams);
+  }
+
+  removeTrack(sender: RTCRtpSender): void {
+    this.connection.removeTrack(sender);
+  }
+
   async initialize(token: string, gistId?: string): Promise<void> {
     this.gist = new Gist(token);
+
+    let connection = new RTCPeerConnection();
+
+    connection.onicecandidate = this.onIceCandidate;
+    connection.ondatachannel = this.onDataChannel;
+    connection.ontrack = this.onTrack;
+
+    // maybe will use in feature
+    // https://stackoverflow.com/questions/48963787/failed-to-set-local-answer-sdp-called-in-wrong-state-kstable
+    connection.onnegotiationneeded = e => {
+      console.log(e, 'onnegotiationneeded');
+    };
+    connection.onsignalingstatechange = e => {
+      console.log(e, connection.signalingState);
+    };
+
+    this.connection = connection;
 
     let sourceGistId = gistId || (await this.getSourceGistId());
 
@@ -70,21 +99,11 @@ export class Connection<
     }
 
     this.sourceGistId = sourceGistId;
-
-    let connection = new RTCPeerConnection();
-
-    connection.onicecandidate = this.onIceCandidate;
-    connection.ondatachannel = this.onDataChannel;
-
-    // maybe will use in feature
-    // https://stackoverflow.com/questions/48963787/failed-to-set-local-answer-sdp-called-in-wrong-state-kstable
-    // connection.onnegotiationneeded =  e => {};
-    // connection.onsignalingstatechange = e => {this.isNegotiating = connection.signalingState !== 'stable';};
-
-    this.connection = connection;
   }
 
   async createRoom(roomId: string = DEFAULT_ROOM_ID): Promise<void> {
+    await this.ready;
+
     let connection = this.connection;
 
     // 需要在 create offer 之前创建 channel
@@ -101,7 +120,7 @@ export class Connection<
       ice: {
         [this.connectionId]: candidates,
       },
-      offer: connection.localDescription?.toJSON(),
+      offer,
     });
 
     let timer = setInterval(async () => {
@@ -110,9 +129,7 @@ export class Connection<
       if (room.answer) {
         clearInterval(timer);
 
-        await connection.setRemoteDescription(
-          new RTCSessionDescription(room.answer),
-        );
+        await connection.setRemoteDescription(room.answer);
 
         await this.addCandidates(room.ice);
       }
@@ -120,6 +137,8 @@ export class Connection<
   }
 
   async joinRoom(roomId: string = DEFAULT_ROOM_ID): Promise<boolean> {
+    await this.ready;
+
     let room = await this.getRoom(roomId);
 
     if (!room.offer) {
@@ -128,9 +147,7 @@ export class Connection<
 
     let connection = this.connection;
 
-    await connection.setRemoteDescription(
-      new RTCSessionDescription(room.offer),
-    );
+    await connection.setRemoteDescription(room.offer);
 
     await this.addCandidates(room.ice);
 
@@ -145,13 +162,15 @@ export class Connection<
       ice: {
         [this.connectionId]: candidates,
       },
-      answer: connection.localDescription?.toJSON(),
+      answer,
     });
 
     return true;
   }
 
   async leaveRoom(_roomId: string = 'default_room'): Promise<void> {
+    await this.ready;
+
     // TODO: 清理关闭顺序 channel -> connection
   }
 
@@ -277,5 +296,9 @@ export class Connection<
 
   private onDataChannel = (event: RTCDataChannelEvent): void => {
     this.setChannel(event.channel);
+  };
+
+  private onTrack = (event: RTCTrackEvent): void => {
+    this.ee.emit('track', event);
   };
 }

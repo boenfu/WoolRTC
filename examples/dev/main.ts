@@ -5,12 +5,12 @@ let connection: Connection<{type: 'msg'; data: string}> | undefined;
 let createdOrJoined = false;
 let channelOpened = false;
 
-(document.getElementById(
+document.querySelector<HTMLInputElement>('#token').value = localStorage.getItem(
   'token',
-) as HTMLInputElement).value = localStorage.getItem('token');
+);
 
 document.getElementById('save')?.addEventListener('click', async () => {
-  let token = (document.getElementById('token') as HTMLInputElement).value;
+  let token = document.querySelector<HTMLInputElement>('#token').value;
 
   localStorage.setItem('token', token);
 
@@ -44,6 +44,8 @@ document.getElementById('save')?.addEventListener('click', async () => {
   connection.on('msg', (text: string) => {
     appendChat('对方', text);
   });
+
+  connection.on('track', receiveStream);
 
   appendChat('系统', '初始化完成，可以创建或加入房间了 👌');
 });
@@ -85,7 +87,7 @@ document.getElementById('send')?.addEventListener('click', async () => {
     );
   }
 
-  let input = document.getElementById('text') as HTMLInputElement;
+  let input = document.querySelector<HTMLInputElement>('#text');
 
   connection.send('msg', input.value);
 
@@ -126,4 +128,95 @@ function appendChat(title: string, text: string | Node) {
   chat.append(div);
 
   div.scrollIntoView(false);
+}
+
+// media part
+
+let mediaStream: MediaStream | undefined;
+
+// add toggle video window event
+for (let element of document.querySelectorAll<HTMLVideoElement>('video')) {
+  element.addEventListener('click', () => {
+    if (!element.classList.contains('mini-video')) {
+      return;
+    }
+
+    document
+      .querySelectorAll<HTMLVideoElement>('video')
+      .forEach(e => e.classList.toggle('mini-video'));
+  });
+}
+
+// add toggle media button
+for (let media of ['video', 'audio'] as const) {
+  document
+    .getElementById(media)
+    .addEventListener('click', ({currentTarget}) => {
+      if (!connection) {
+        return appendChat('系统', '请初始化后使用通话 ❌');
+      }
+
+      let element = currentTarget as HTMLElement;
+
+      if (element.classList.contains('opening')) {
+        closeMedia(media);
+      } else {
+        openMedia(media);
+      }
+
+      element.classList.toggle('opening');
+    });
+}
+
+function closeMedia(type?: 'video' | 'audio'): void {
+  let willRemoveTracks = type
+    ? type === 'video'
+      ? mediaStream.getVideoTracks()
+      : mediaStream.getAudioTracks()
+    : mediaStream.getTracks();
+
+  for (let track of willRemoveTracks) {
+    track.stop();
+    mediaStream.removeTrack(track);
+  }
+}
+
+async function openMedia(type?: 'video' | 'audio'): Promise<void> {
+  let stream = await navigator.mediaDevices.getUserMedia({
+    ...(type
+      ? {
+          [type]: true,
+        }
+      : {video: true, audio: true}),
+  });
+
+  if (!mediaStream) {
+    mediaStream = stream;
+
+    for (let track of stream.getTracks()) {
+      connection.addTrack(track, stream);
+    }
+  } else {
+    closeMedia(type);
+
+    let willAddTracks = type
+      ? type === 'video'
+        ? stream.getVideoTracks()
+        : stream.getAudioTracks()
+      : stream.getTracks();
+
+    for (let track of willAddTracks) {
+      mediaStream.addTrack(track);
+      connection.addTrack(track, mediaStream);
+    }
+  }
+
+  document.querySelector<HTMLVideoElement>(
+    '#video-local',
+  ).srcObject = mediaStream;
+}
+
+function receiveStream(event: RTCTrackEvent) {
+  document.querySelector<HTMLVideoElement>('#video-remote').srcObject =
+    event.streams[0];
 }
