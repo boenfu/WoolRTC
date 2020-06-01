@@ -1,10 +1,10 @@
 {
-  "name": "pist",
+  "name": "wool-rtc",
   "version": "0.1.0",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
-  "repository": "git@github.com:boenfu/pist.git",
+  "repository": "git@github.com:boenfu/WoolRTC.git",
   "author": "boenfu <1997@boenfu.cn>",
   "license": "MIT",
   "private": false,

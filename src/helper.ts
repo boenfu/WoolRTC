@@ -1,22 +1,22 @@
 import {CreateGist, GistFileInfo, GistInfo} from './gist';
 
-export function isPist(gist: GistInfo): boolean {
-  return gist.description === '__pist_repo__';
+export function isWoolRTC(gist: GistInfo): boolean {
+  return gist.description === '__wool_rtc_repo__';
 }
 
-export function getPistRoomName(roomId: string): string {
-  return `__pist_room__:${roomId}`;
+export function getWoolRTCRoomName(roomId: string): string {
+  return `__wool_rtc_room__:${roomId}`;
 }
 
-export function isPistRoom(gist: GistFileInfo): boolean {
-  return gist.filename.startsWith('__pist_room__:');
+export function isWoolRTCRoom(gist: GistFileInfo): boolean {
+  return gist.filename.startsWith('__wool_rtc_room__:');
 }
 
-export function getDefaultPist(roomId: string): CreateGist['params'] {
+export function getDefaultWoolRTC(roomId: string): CreateGist['params'] {
   return {
-    description: '__pist_repo__',
+    description: '__wool_rtc_repo__',
     files: {
-      [getPistRoomName(roomId)]: {
+      [getWoolRTCRoomName(roomId)]: {
         content: JSON.stringify({}),
       },
     },

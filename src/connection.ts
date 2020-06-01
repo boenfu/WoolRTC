@@ -2,7 +2,7 @@ import ee from 'event-emitter';
 import {v4 as uuid} from 'uuid';
 
 import {Gist} from './gist';
-import {getDefaultPist, getPistRoomName, isPist} from './helper';
+import {getDefaultWoolRTC, getWoolRTCRoomName, isWoolRTC} from './helper';
 
 const DEFAULT_ROOM_ID = 'default_room';
 const GATHER_CANDIDATE_TIMEOUT = 10000;
@@ -95,7 +95,7 @@ export class Connection<
     let sourceGistId = gistId || (await this.getSourceGistId());
 
     if (!sourceGistId) {
-      throw Error('[ pist ]: get source gist id failed');
+      throw Error('[ WoolRTC ]: get source gist id failed');
     }
 
     this.sourceGistId = sourceGistId;
@@ -107,7 +107,7 @@ export class Connection<
     let connection = this.connection;
 
     // 需要在 create offer 之前创建 channel
-    this.setChannel(connection.createDataChannel('pist'));
+    this.setChannel(connection.createDataChannel('WoolRTC'));
 
     let offer = await connection.createOffer();
 
@@ -116,7 +116,7 @@ export class Connection<
     let candidates = await this.gatherCandidate();
 
     await this.updateRoom({
-      name: getPistRoomName(roomId),
+      name: getWoolRTCRoomName(roomId),
       ice: {
         [this.connectionId]: candidates,
       },
@@ -177,25 +177,27 @@ export class Connection<
   private async getSourceGistId(): Promise<string> {
     let list = await this.gist.getList();
 
-    let gist = list.find(item => isPist(item));
+    let gist = list.find(item => isWoolRTC(item));
 
     if (gist) {
       return gist.id;
     }
 
-    let {id} = await this.gist.create(getDefaultPist(DEFAULT_ROOM_ID));
+    let {id} = await this.gist.create(getDefaultWoolRTC(DEFAULT_ROOM_ID));
 
     return id;
   }
 
   private async getRoom(roomId: string): Promise<Room> {
-    let roomName = getPistRoomName(roomId);
+    let roomName = getWoolRTCRoomName(roomId);
     let sourceGistId = this.sourceGistId!;
 
     let gist = await this.gist.get(sourceGistId);
 
     if (!gist) {
-      throw Error(`[ pist ]: the gist(${sourceGistId}) may be deleted in use`);
+      throw Error(
+        `[ WoolRTC ]: the gist(${sourceGistId}) may be deleted in use`,
+      );
     }
 
     let room = gist?.files[roomName];
