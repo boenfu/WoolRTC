@@ -7,7 +7,7 @@ import {getDefaultWoolRTC, getWoolRTCRoomName, isWoolRTC} from './helper';
 const DEFAULT_ROOM_ID = 'default_room';
 const GATHER_CANDIDATE_TIMEOUT = 10000;
 const PEEK_CANDIDATE_READY_INTERVAL = 200;
-const PEEK_ANSWER_RECEIVED_INTERVAL = 2000;
+const PEEK_ANSWER_RECEIVED_INTERVAL = 1000;
 
 interface Room {
   name: string;
@@ -49,6 +49,7 @@ export class Connection<
   private channel: RTCDataChannel | undefined;
 
   private pendingRTCIceCandidates: (RTCIceCandidate | null)[] = [];
+  private isNegotiating = false;
 
   private ready!: Promise<void>;
 
@@ -80,14 +81,38 @@ export class Connection<
     connection.onicecandidate = this.onIceCandidate;
     connection.ondatachannel = this.onDataChannel;
     connection.ontrack = this.onTrack;
+    connection.onsignalingstatechange = e => {
+      this.isNegotiating = connection.signalingState !== 'stable';
+    };
 
     // maybe will use in feature
     // https://stackoverflow.com/questions/48963787/failed-to-set-local-answer-sdp-called-in-wrong-state-kstable
-    connection.onnegotiationneeded = e => {
+    connection.onnegotiationneeded = async e => {
       console.log(e, 'onnegotiationneeded');
-    };
-    connection.onsignalingstatechange = e => {
-      console.log(e, connection.signalingState);
+
+      if (this.isNegotiating) {
+        console.log('协商中被拒了');
+        return;
+      }
+
+      this.isNegotiating = true;
+
+      // 通知对方加入房间
+
+      console.log('通知对方加入房间');
+
+      await this.send('renegotiate', {});
+
+      // console.log('重新创建房间');
+
+      // // 重新创建房间
+      // await this.createRoom();
+
+      setTimeout(() => {
+        console.log('重新加入房间');
+
+        this.joinRoom();
+      }, 10000);
     };
 
     this.connection = connection;
@@ -106,14 +131,19 @@ export class Connection<
 
     let connection = this.connection;
 
-    // 需要在 create offer 之前创建 channel
-    this.setChannel(connection.createDataChannel('WoolRTC'));
+    if (!this.channel) {
+      // 需要在 create offer 之前创建 channel
+      this.setChannel(connection.createDataChannel('WoolRTC'));
+    }
 
-    let offer = await connection.createOffer();
+    let offer = await connection.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true,
+    });
 
     await connection.setLocalDescription(offer);
 
-    let candidates = await this.gatherCandidate();
+    let candidates = this.channel ? [] : await this.gatherCandidate();
 
     await this.updateRoom({
       name: getWoolRTCRoomName(roomId),
@@ -155,7 +185,7 @@ export class Connection<
 
     await connection.setLocalDescription(answer);
 
-    let candidates = await this.gatherCandidate();
+    let candidates = this.channel ? [] : await this.gatherCandidate();
 
     await this.updateRoom({
       ...room,
@@ -226,6 +256,15 @@ export class Connection<
   private setChannel(channel: RTCDataChannel): void {
     channel.onmessage = ({data}) => {
       let event = JSON.parse(data);
+
+      console.log(event);
+
+      if (event.type === 'renegotiate') {
+        this.createRoom();
+
+        return;
+      }
+
       this.ee.emit(event.type, event.data);
     };
 
@@ -293,6 +332,8 @@ export class Connection<
   private onIceCandidate = async ({
     candidate,
   }: RTCPeerConnectionIceEvent): Promise<void> => {
+    console.log('onIceCandidate');
+
     this.pendingRTCIceCandidates.push(candidate);
   };
 
